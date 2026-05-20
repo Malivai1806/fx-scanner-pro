@@ -3,6 +3,7 @@ import { fetchCandles } from '@/lib/api-service';
 import { calculateIndicators, detectPatterns, detectTrend, findSupportResistance, generateSignal } from '@/lib/analysis';
 import type { PairAnalysis, PairInfo, Timeframe, TrendData } from '@/lib/forex-types';
 import { FOREX_PAIRS } from '@/lib/forex-types';
+import { sendSignalNotification, requestNotificationPermission } from '@/lib/notifications';
 
 // HTF map — welke timeframe geeft context
 const HTF_MAP: Partial<Record<Timeframe, Timeframe>> = {
@@ -66,6 +67,11 @@ export function useScanner() {
 
       const signal = generateSignal(candles, indicators, sr, trend, pair.pipSize, htfTrend);
 
+      // Push notificatie bij sterk signaal
+      if (signal && signal.type !== 'NEUTRAL') {
+        sendSignalNotification(pair.symbol, signal.type as 'BUY' | 'SELL', signal.strength, currentPrice);
+      }
+
       return {
         pair, price: currentPrice, change24h, changePercent,
         trend: { [timeframe]: trend }, patterns, indicators,
@@ -121,6 +127,7 @@ export function useScanner() {
   }, [analyzePair]);
 
   useEffect(() => {
+    requestNotificationPermission();
     scanAllPairs(selectedTimeframe);
     scanIntervalRef.current = setInterval(() => {
       scanAllPairs(selectedTimeframe);
